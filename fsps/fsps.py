@@ -593,7 +593,8 @@ class StellarPopulation(object):
 
         NTFULL = driver.get_ntfull()
         NBANDS = driver.get_nbands()
-
+        NSPEC = driver.get_nspec()
+        
         if filter_dict is None:
             filter_dict = FILTERS
         band_array = np.ones(NBANDS, dtype=bool)
@@ -605,7 +606,7 @@ class StellarPopulation(object):
                                 dtype=bool)] = False
 
         inds = np.array(band_array, dtype=int)
-        mags = driver.get_mags(NTFULL, redshift, inds)
+        mags = driver.get_mags(NSPEC, NTFULL, redshift, inds)
 
         if tage > 0.0:
             if bands is not None:
