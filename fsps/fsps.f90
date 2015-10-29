@@ -15,49 +15,46 @@ module driver
   !f2py intent(hide) has_ssp
   integer, dimension(nz) :: has_ssp=0
 
+  !f2py intent(hide) has_ssp_age
+  integer, dimension(nz,nt) :: has_ssp_age=0
+
+  
 contains
 
-  subroutine setup(compute_vega_mags0,redshift_colors0,smooth_velocity0,&
-                   add_stellar_remnants0,add_neb_emission0, &
-                   add_dust_emission0,add_agb_dust_model0, &
-                   tpagb_norm_type0)
+  subroutine setup(compute_vega_mags0)
 
     ! Load all the data files/templates into memory.
 
     implicit none
 
-    integer, intent(in) :: compute_vega_mags0, redshift_colors0, &
-         smooth_velocity0,add_stellar_remnants0,add_neb_emission0, &
-         add_dust_emission0,add_agb_dust_model0,tpagb_norm_type0
+    integer, intent(in) :: compute_vega_mags0
          
 
     compute_vega_mags = compute_vega_mags0
-    redshift_colors = redshift_colors0
-    smooth_velocity = smooth_velocity0
-    add_dust_emission = add_dust_emission0
-    add_agb_dust_model = add_agb_dust_model0
-    add_neb_emission = add_neb_emission0
-    add_stellar_remnants = add_stellar_remnants0
-    tpagb_norm_type = tpagb_norm_type0
     call sps_setup(-1)
     is_setup = 1
 
   end subroutine
 
   subroutine set_ssp_params(imf_type0,imf1,imf2,imf3,vdmc,mdave,dell,&
-                            delt,sbss,fbhb,pagb,agb_dust,redgb,&
-                            masscut,fcstar,evtype)
-
+                            delt,sbss,fbhb,pagb,add_stellar_remnants0,&
+                            tpagb_norm_type0,add_agb_dust_model0,agb_dust,&
+                            redgb,masscut,fcstar,evtype)
+ 
     ! Set the parameters that affect the SSP computation.
 
     implicit none
 
-    integer, intent(in) :: imf_type0
+    integer, intent(in) :: imf_type0,add_stellar_remnants0,tpagb_norm_type0,&
+                           add_agb_dust_model0
     double precision, intent(in) :: imf1,imf2,imf3,vdmc,mdave,dell,&
                                     delt,sbss,fbhb,pagb,agb_dust,&
                                     redgb,masscut,fcstar,evtype
 
     imf_type=imf_type0
+    add_stellar_remnants=add_stellar_remnants0
+    tpagb_norm_type=tpagb_norm_type0
+    add_agb_dust_model=add_agb_dust_model0
     pset%imf1=imf1
     pset%imf2=imf2
     pset%imf3=imf3
@@ -75,31 +72,48 @@ contains
     pset%evtype=evtype
 
     has_ssp(:) = 0
-
+    has_ssp_age(:,:) = 0
+    
   end subroutine
 
-  subroutine set_csp_params(dust_type0,zmet,sfh,wgp1,wgp2,wgp3,tau,&
+  subroutine set_csp_params(smooth_velocity0,vactoair_flag0,redshift_colors0,&
+                            dust_type0,add_dust_emission0,add_neb_emission0,&
+                            add_neb_continuum0,cloudy_dust0,add_igm_absorption0,&
+                            zmet,sfh,wgp1,wgp2,wgp3,tau,&
                             const,tage,fburst,tburst,dust1,dust2,&
                             logzsol,zred,pmetals,dust_clumps,frac_nodust,&
                             dust_index,dust_tesc,frac_obrun,uvb,mwr,&
-                            dust1_index,sf_start,sf_trunc,sf_theta,&
+                            dust1_index,sf_start,sf_trunc,sf_slope,&
                             duste_gamma,duste_umin,duste_qpah,&
                             sigma_smooth,min_wave_smooth,&
-                            max_wave_smooth)
+                            max_wave_smooth,gas_logu,gas_logz,igm_factor)
 
     ! Set all the parameters that don't affect the SSP computation.
 
     implicit none
-
-    integer, intent(in) :: dust_type0,zmet,sfh,wgp1,wgp2,wgp3
+    
+    integer, intent(in) :: smooth_velocity0,vactoair_flag0,redshift_colors0,&
+                           dust_type0,add_dust_emission0,add_neb_emission0,&
+                           add_neb_continuum0,cloudy_dust0,add_igm_absorption0,&
+                           zmet,sfh,wgp1,wgp2,wgp3
     double precision, intent(in) :: tau,&
                             const,tage,fburst,tburst,dust1,dust2,&
                             logzsol,zred,pmetals,dust_clumps,frac_nodust,&
                             dust_index,dust_tesc,frac_obrun,uvb,mwr,&
-                            dust1_index,sf_start,sf_trunc,sf_theta,&
+                            dust1_index,sf_start,sf_trunc,sf_slope,&
                             duste_gamma,duste_umin,duste_qpah,&
                             sigma_smooth,min_wave_smooth,&
-                            max_wave_smooth
+                            max_wave_smooth,gas_logu,gas_logz,igm_factor
+
+    smooth_velocity=smooth_velocity0
+    vactoair_flag=vactoair_flag0
+    redshift_colors=redshift_colors0
+    dust_type=dust_type0
+    add_dust_emission=add_dust_emission0
+    add_neb_emission=add_neb_emission0
+    add_neb_continuum=add_neb_continuum0
+    cloudy_dust=cloudy_dust0
+    add_igm_absorption=add_igm_absorption0
 
     pset%zmet=zmet
     pset%sfh=sfh
@@ -127,14 +141,17 @@ contains
     pset%dust1_index=dust1_index
     pset%sf_start=sf_start
     pset%sf_trunc=sf_trunc
-    pset%sf_theta=sf_theta
+    pset%sf_slope=sf_slope
     pset%duste_gamma=duste_gamma
     pset%duste_umin=duste_umin
     pset%duste_qpah=duste_qpah
     pset%sigma_smooth=sigma_smooth
     pset%min_wave_smooth=min_wave_smooth
     pset%max_wave_smooth=max_wave_smooth
-
+    pset%gas_logu=gas_logu
+    pset%gas_logz=gas_logz
+    pset%igm_factor=igm_factor
+    
   end subroutine
 
   subroutine ssps
@@ -157,9 +174,12 @@ contains
     integer, intent(in) :: zi
     pset%zmet = zi
     call ssp_gen(pset, mass_ssp_zz(:,zi),lbol_ssp_zz(:,zi),&
-                 spec_ssp_zz(:,:,zi))
-    has_ssp(zi) = 1
-
+         spec_ssp_zz(:,:,zi))
+    if (minval(pset%ssp_gen_age) .eq. 1) then
+       has_ssp(zi) = 1
+    endif
+    has_ssp_age(zi,:) = pset%ssp_gen_age
+    
   end subroutine
 
   subroutine get_ssp_spec(ns,n_age,n_z,ssp_spec_out,ssp_mass_out,ssp_lbol_out)
@@ -199,16 +219,24 @@ contains
     double precision, dimension(ns,1), intent(inout) :: spec
     double precision, dimension(1), intent(inout) :: mass,lbol
 
-    integer :: zlo,zmet
+    double precision, dimension(nt) :: time
+    
+    integer :: zlo,zmet,tlo
 
     zlo = max(min(locate(log10(zlegend/0.0190),zpos),nz-1),1)
+    time = timestep_isoc(zlo,:)
+    tlo = max(min(locate(time,tpos),nt-1),1)
+
     do zmet=zlo,zlo+1
-       if (has_ssp(zmet) .eq. 0) then
+       if ((has_ssp_age(zmet,tlo) .eq. 0) .or. (has_ssp_age(zmet,tlo+1) .eq. 0)) then
+          pset%ssp_gen_age = 0
+          pset%ssp_gen_age(tlo:tlo+1) = 1
           call ssp(zmet)
+          pset%ssp_gen_age = 1
        endif
     enddo
 
-    call ztinterp(zpos,spec,lbol,mass,tpos)
+    call ztinterp(zpos,spec,lbol,mass,tpos=tpos)
 
     end subroutine
 
@@ -243,30 +271,60 @@ contains
   end subroutine
 
 
-  subroutine compute_zdep(ns,n_age)
+  subroutine compute_zdep(ns,n_age,ztype)
 
     ! Compute the full CSP (and the SSPs if they aren't already cached).
     ! After interpolation in metallicity
 
     implicit none
-    integer, intent(in) :: ns,n_age
+    integer, intent(in) :: ns,n_age,ztype
     double precision, dimension(ns,n_age) :: spec
     double precision, dimension(n_age) :: mass,lbol
     integer :: zlo,zmet
-    double precision :: dz,zpos
+    double precision :: zpos
     character(100) :: outfile
 
-    ! Find the bracketing metallicity indices and generate ssps if
-    ! necessary, then interpolate.
-    zpos = pset%logzsol
-    zlo = max(min(locate(log10(zlegend/0.0190),zpos),nz-1),1)
-    do zmet=zlo,zlo+1
+    if (ztype .eq. 0) then
+       ! Build the SSP for one metallicity, then feed to compsp
+       zmet = pset%zmet
        if (has_ssp(zmet) .eq. 0) then
           call ssp(zmet)
        endif
-    enddo
-    call ztinterp(zpos,spec,lbol,mass)
-    call compsp(0,1,outfile,mass,lbol,spec,pset,ocompsp)
+       !mass = mass_ssp_zz(:,zmet)
+       !lbol = lbol_ssp_zz(:,zmet)
+       !spec = spec_ssp_zz(:,:,zmet)
+       call compsp(0,1,outfile,mass_ssp_zz(:,zmet),lbol_ssp_zz(:,zmet),&
+            spec_ssp_zz(:,:,zmet),pset,ocompsp)
+    endif
+
+    if (ztype .eq. 1) then
+       zpos = pset%logzsol
+       ! Find the bracketing metallicity indices and generate ssps if
+       ! necessary, then interpolate, and feed the result to compsp
+       zlo = max(min(locate(log10(zlegend/0.0190),zpos),nz-1),1)
+       do zmet=zlo,zlo+1
+          if (has_ssp(zmet) .eq. 0) then
+             call ssp(zmet)
+          endif
+       enddo
+       call ztinterp(zpos,spec,lbol,mass)
+       call compsp(0,1,outfile,mass,lbol,spec,pset,ocompsp)
+    endif
+    
+    if (ztype .eq. 2) then
+       zpos = pset%logzsol
+       ! Build the SSPs for *every* metallicity if necessary, then
+       ! comvolve with the MDF, and then feed to compsp
+       do zmet=1,nz
+          if (has_ssp(zmet) .eq. 0) then
+             call ssp(zmet)
+          endif
+       enddo
+       call ztinterp(zpos,spec,lbol,mass,zpow=pset%pmetals)
+       call compsp(0,1,outfile,mass,lbol,spec,pset,ocompsp)
+    endif
+     
+    
 
   end subroutine
 
@@ -285,33 +343,44 @@ contains
 
   end subroutine
 
-  subroutine get_mags(n_age,n_bands,z_red,mc,mags)
+  subroutine get_mags(ns,n_age,n_bands,z_red,mc,mags)
 
     ! Get the photometric magnitudes in all the recognized bands.
+    
     implicit none
     integer :: i
-    integer, intent(in) :: n_age, n_bands
+    integer, intent(in) :: ns, n_age, n_bands
     double precision, intent(in) :: z_red
     integer, dimension(n_bands), intent(in) :: mc
     double precision, dimension(n_age,n_bands), intent(out) :: mags
+    double precision, dimension(ns) :: tspec
     do i=1,n_age
-      call getmags(z_red,ocompsp(i)%spec,mags(i,:),mc)
+      tspec = ocompsp(i)%spec
+      call getmags(z_red,tspec,mags(i,:),mc)
     enddo
 
   end subroutine
 
-  subroutine get_setup_vars(cvms, rcolors, svel, asr, ane, ade, agbd, agbn)
+  subroutine stellar_spectrum(ns,mact,logt,lbol,logg,phase,ffco,wght,spec_out)
+    
+    ! Get a stellar spectrum for a given set of parameters
+    
+    implicit none
+    integer :: i
+    integer, intent(in) :: ns
+    double precision, intent(in) :: mact, logt, lbol, logg, phase, ffco, wght
+    double precision, dimension(ns), intent(inout) :: spec_out
+
+    call getspec(pset,mact,logt,lbol,logg,phase,ffco,wght,spec_out)
+    
+  end subroutine 
+  
+  
+  subroutine get_setup_vars(cvms)
 
     implicit none
-    integer, intent(out) :: cvms, rcolors, svel, asr, ane, ade, agbd, agbn
+    integer, intent(out) :: cvms
     cvms = compute_vega_mags
-    rcolors = redshift_colors
-    svel = smooth_velocity
-    asr = add_stellar_remnants
-    ane = add_neb_emission 
-    ade = add_dust_emission
-    agbd = add_agb_dust_model
-    agbn = tpagb_norm_type
 
   end subroutine
 
@@ -427,49 +496,6 @@ contains
 
   end subroutine
 
-  subroutine get_isochrone(zz,tt,n_mass,n_mags,time_out,z_out,&
-                           mass_init_out,logl_out,logt_out,logg_out,&
-                           ffco_out,phase_out,wght_out,mags_out)
-
-    implicit none
-
-    integer, intent(in) :: zz,tt,n_mass,n_mags
-    double precision, intent(out) :: time_out, z_out
-    double precision, dimension(n_mass), intent(out) :: mass_init_out
-    double precision, dimension(n_mass), intent(out) :: logl_out
-    double precision, dimension(n_mass), intent(out) :: logt_out
-    double precision, dimension(n_mass), intent(out) :: logg_out
-    double precision, dimension(n_mass), intent(out) :: ffco_out
-    double precision, dimension(n_mass), intent(out) :: phase_out
-    double precision, dimension(n_mass), intent(out) :: wght_out
-    double precision, dimension(n_mass, n_mags), intent(out) :: mags_out
-    integer :: i
-    double precision, dimension(nm) :: wght
-    double precision, dimension(nspec)  :: spec
-    double precision, dimension(nbands) :: mags
-
-    call imf_weight(mini_isoc(zz,tt,:), wght, nmass_isoc(zz,tt))
-    do i = 1, nmass_isoc(zz,tt)
-    ! Compute mags on isochrone at this mass
-       call getspec(pset, mact_isoc(zz,tt,i), &
-            logt_isoc(zz,tt,i), 10**logl_isoc(zz,tt,i), logg_isoc(zz,tt,i), &
-            phase_isoc(zz,tt,i), ffco_isoc(zz,tt,i), spec)
-       call getmags(0.d0, spec, mags)
-       mass_init_out(i) = mini_isoc(zz,tt,i)
-       logl_out(i) = logl_isoc(zz,tt,i)
-       logt_out(i) = logt_isoc(zz,tt,i)
-       logg_out(i) = logg_isoc(zz,tt,i)
-       ffco_out(i) = ffco_isoc(zz,tt,i)
-       phase_out(i) = phase_isoc(zz,tt,i)
-       wght_out(i) = wght(i)
-       mags_out(i,:) = mags(:)
-    end do
-
-    ! Fill in time and metallicity of this isochrone
-    time_out = timestep_isoc(zz, tt)
-    z_out = log10(zlegend(zz) / 0.0190) ! log(Z/Zsolar)
-
-  end subroutine
 
   subroutine write_isoc(outfile)
 

@@ -29,19 +29,28 @@ class StellarPopulation(object):
         sp = StellarPopulation(imf_type=2)
         sp.params["imf_type"] = 1
 
-    :param compute_vega_mags: (default: True)
+    :param compute_vega_mags: (default: False)
         A switch that sets the zero points of the magnitude system: ``True``
         uses Vega magnitudes versus AB magnitudes.
 
-    :param zcontinuous: (default: False)
-        A switch that controls whether interpolation in metallicity is
-        performed before computing composite models.  If ``True`` then
-        the SSPs are interpolated to the value of ``logzsol`` before
-        the spectra and magnitudes are computed, and the value of
-        ``zmet`` is ignored.
-        
-    :param redshift_colors: (default: False)
 
+    :param vactoair_flag: (default: False)
+        If ``True``, output wavelengths in air (rather than vac).
+
+    :param zcontinuous: (default: 0)
+        Flag specifying how interpolation in metallicity is
+        performed before computing composite models:
+        
+        * 0: No interpolation, use the metallicity index specified by
+          ``zmet``.
+        * 1: The SSPs are interpolated to the value of ``logzsol``
+          before the spectra and magnitudes are computed, and the
+          value of ``zmet`` is ignored.
+        * 2: The SSPs are convolved with a metallicity distribution
+          function specified by the ``logzsol`` and ``pmetals``
+          parameters. The value of ``zmet`` is ignored.
+
+    :param redshift_colors: (default: False)
         * ``False``: Magnitudes are computed at a fixed redshift specified
           by ``zred``.
         * ``True``: Magnitudes are computed at a redshift that corresponds
@@ -55,29 +64,42 @@ class StellarPopulation(object):
         wavelength space.
 
     :param add_stellar_remnants: (default: True)
-        Switch to add stellar remnnants in the stellar mass
+        Switch to add stellar remnants in the stellar mass
         computation.
 
+    :param add_igm_absorption: (default: False)
+        Switch to include IGM absorption via Madau (1995).  The
+        ``zred`` parameter must be non-zero for this switch to have
+        any effect. The optical depth can be scaled using the
+        ``igm_factor`` parameter.
+        
     :param add_neb_emission: (default: False)
         Switch to turn on/off a Cloudy-based nebular emission
-        model. NB: this feature is currently under development, do not
-        use!
+        model. 
 
+    :param add_neb_continuum: (default: True)
+        Switch to turn on/off the nebular continuum component
+        (automatically turned off if ``add_neb_emission`` is
+        ``False``).
+
+    :param cloudy_dust: (default: False)
+        Switch to include dust in the Cloudy tables.
+        
     :param add_dust_emission: (default: True)
         Switch to turn on/off the Draine & Li 2007 dust emission
         model.
 
-    :param add_agb_dust_model: (default: False)
+    :param add_agb_dust_model: (default: True)
         Switch to turn on/off the AGB circumstellar dust model. NB:
         this feature is currently under development, do not use!  If
         you do use it, note that the AGB dust emission is scaled by
         the parameter `agb_dust`.
 
-    :param tpagb_norm_type: (default: 1)
+    :param tpagb_norm_type: (default: 2)
         Flag specifying TP-AGB normalization scheme:
         * 0: default Padova 2007 isochrones
         * 1: Conroy & Gunn 2010 normalization
-        * 2: Villaume, Conroy, Johnson 2014 normalization
+        * 2: Villaume, Conroy, Johnson 2015 normalization
         
     :param dust_type: (default: 0)
         Common variable deﬁning the extinction curve for dust around old
@@ -164,17 +186,24 @@ class StellarPopulation(object):
         Dust parameter describing the attenuation of old stellar light,
         i.e. where ``t > dust_tesc`` (for details, see Conroy et al. 2009a).
 
-    :param logzsol: (default: -0.2)
+    :param logzsol: (default: 0.0)
         Parameter describing the metallicity, given in units of
-        log(Z/Z_sun).  Only used if ``zontinuous=True``.
+        log(Z/Z_sun).  Only used if ``zcontinuous=1`` or
+        ``zcontinuous=2``.
 
     :param zred: (default: 0.0)
         Redshift. If this value is non-zero and if ``redshift_colors=1``,
         the magnitudes will be computed for the spectrum placed at redshift
         ``zred``.
 
-    :param pmetals: (default: 0.02)
-        Undocumented.
+    :param pmetals: (default: 2.0)
+       The power for the metallicty distribution function.  The MDF is
+       given by :math:`(Z \\, e^{{-Z}})^{{pmetals}}` where :math:`Z =
+       z/(z_\\odot \\, 10^{{logzsol}})` and z is the metallicity in
+       linear units (i.e., :math:`z_\odot = 0.019`).  Using a negative
+       value will result in smoothing of the SSPs by a three-point
+       triangular kernel before linear interpolation (in logZ) to the
+       requested metallicity.
 
     :param imf1: (default: 1.3)
         Logarithmic slope of the IMF over the range :math:`0.08 < M < 0.5
@@ -212,7 +241,9 @@ class StellarPopulation(object):
         are :math:`\\log (\\mathrm{yrs})`.
 
     :param frac_obrun: (default: 0.0)
-        Undocumented.
+        Fraction of the young stars (age < dust_tesc) that are not
+        attenuated by ``dust1``, representing runaway OB stars.  These
+        stars are still attenuated by ``dust2``.
 
     :param uvb: (default: 1.0)
         Parameter characterizing the strength of the 2175A extinction feature
@@ -228,7 +259,9 @@ class StellarPopulation(object):
         Weighting of red  giant branch.
 
     :param dust1_index: (default: -1.0)
-        Undocumented.
+        Power law index of the attenuation curve affecting stars
+        younger than dust_tesc corresponding to ``dust1``. Only used
+        when ``dust_type=0``.
 
     :param mdave: (default: 0.5)
         IMF parameter defined in Dave (2008). Only used if ``imf_type=4``.
@@ -239,7 +272,7 @@ class StellarPopulation(object):
     :param sf_trunc: (default: 0.0)
         Undocumented.
 
-    :param sf_theta: (default: 0.0)
+    :param sf_slope: (default: 0.0)
         Undocumented.
 
     :param duste_gamma: (default: 0.01)
@@ -269,7 +302,8 @@ class StellarPopulation(object):
         Truncate the IMF above this value.
 
     :param zmet: (default: 1)
-        The metallicity is specified as an integer ranging between 1 and nz.
+        The metallicity is specified as an integer ranging between 1
+        and nz. If ``zcontinuous > 0`` then this parameter is ignored.
 
     :param sfh: (default: 0)
         Defines the type of star formation history, normalized such that one
@@ -311,7 +345,7 @@ class StellarPopulation(object):
         Gordon (2000) for details.
 
     :param evtype: (default: -1)
-        Compute SSPs for only the given evolutionary type
+        Compute SSPs for only the given evolutionary type.
 
     :param sigma_smooth: (default: 0.0)
         If smooth_velocity is True, this gives the velocity dispersion in
@@ -322,23 +356,41 @@ class StellarPopulation(object):
         Scales the circumstellar AGB dust emission.
 
     :param min_wave_smooth: (default: 1e3)
-        Undocumented.
+        Minimum wavelength to consider when smoothing the spectrum.
 
     :param max_wave_smooth: (default: 1e4)
-        Undocumented.
+        Maximum wavelength to consider when smoothing the spectrum.
 
+    :param gas_logu: (default: -2)
+        Log of the gas ionization parameter, for determining the
+        nebular emission.
+ 
+    :param gas_logz: (default: 0.0)
+        Log of the gas-phase metallicity, for determining the nebular
+        emission.  In units of log10(Z/Z_sun).
+
+    :param igm_factor: (default: 1.0)
+        Fudge factor used to scale the IGM optical depth.
     """
 
-    def __init__(self, compute_vega_mags=True, redshift_colors=False,
-                 smooth_velocity=True, add_stellar_remnants=True,
-                 add_dust_emission=True, add_agb_dust_model=False,
-                 add_neb_emission=False, tpagb_norm_type=1,
-                 zcontinuous=False,**kwargs):
+    def __init__(self, compute_vega_mags=False, zcontinuous=0,
+                 **kwargs):
 
         # Set up the parameters to their default values.
         self.params = ParameterSet(
+            smooth_velocity=True,
+            vactoair_flag=False,
+            redshift_colors=False,
             dust_type=0,
+            add_dust_emission=True,
+            add_agb_dust_model=True,
+            add_neb_emission=False,
+            add_neb_continuum=True,
+            cloudy_dust=False,
+            add_igm_absorption=False,
+            add_stellar_remnants=True,
             imf_type=2,
+            tpagb_norm_type=2,
             pagb=1.0,
             dell=0.0,
             delt=0.0,
@@ -351,9 +403,9 @@ class StellarPopulation(object):
             tburst=11.0,
             dust1=0.0,
             dust2=0.0,
-            logzsol=-0.2,
+            logzsol=0.0,
             zred=0.0,
-            pmetals=0.02,
+            pmetals=2.0,
             imf1=1.3,
             imf2=2.3,
             imf3=2.3,
@@ -370,7 +422,7 @@ class StellarPopulation(object):
             mdave=0.5,
             sf_start=0.0,
             sf_trunc=0.0,
-            sf_theta=0.0,
+            sf_slope=0.0,
             duste_gamma=0.01,
             duste_umin=1.0,
             duste_qpah=3.5,
@@ -386,6 +438,9 @@ class StellarPopulation(object):
             agb_dust=1.0,
             min_wave_smooth=1e3,
             max_wave_smooth=1e4,
+            gas_logu=-2,
+            gas_logz=0.0,
+            igm_factor=1.0,
         )
 
         # Parse any input options.
@@ -400,30 +455,19 @@ class StellarPopulation(object):
         # Before the first time we interact with the FSPS driver, we need to
         # run the ``setup`` method.
         if not driver.is_setup:
-            driver.setup(compute_vega_mags, redshift_colors, smooth_velocity,
-                         add_stellar_remnants, add_neb_emission,
-                         add_dust_emission, add_agb_dust_model,
-                         tpagb_norm_type)
+            driver.setup(compute_vega_mags)
 
         else:
-            cvms, rcolors, svel, asr, ane, ade, agbd, agbn = driver.get_setup_vars()
+            cvms = driver.get_setup_vars()
             assert compute_vega_mags == bool(cvms)
-            assert redshift_colors == bool(rcolors)
-            assert smooth_velocity == bool(svel)
-            assert add_stellar_remnants == bool(asr)
-            assert add_neb_emission == bool(ane)
-            assert add_dust_emission == bool(ade)
-            assert add_agb_dust_model == bool(agbd)
-            assert tpagb_norm_type == agbn
-
-        self._zcontinuous = zcontinuous
             
+        self._zcontinuous = zcontinuous
         # Caching.
         self._wavelengths = None
         self._zlegend = None
         self._ssp_ages = None
         self._stats = None
-        
+
     def _update_params(self):
         if self.params.dirtiness == 2:
             driver.set_ssp_params(*[self.params[k]
@@ -435,12 +479,11 @@ class StellarPopulation(object):
 
     def _compute_csp(self):
         self._update_params()
-        if self._zcontinuous:
-            NSPEC = driver.get_nspec()
-            NTFULL = driver.get_ntfull()
-            driver.compute_zdep(NSPEC, NTFULL)
-        else:
-            driver.compute()
+
+        NSPEC = driver.get_nspec()
+        NTFULL = driver.get_ntfull()
+        driver.compute_zdep(NSPEC, NTFULL, self._zcontinuous)
+                
         self._stats = None
 
     def get_spectrum(self, zmet=None, tage=0.0, peraa=False):
@@ -486,10 +529,10 @@ class StellarPopulation(object):
             factor = np.ones_like(wavegrid)
 
         NSPEC = driver.get_nspec()
-        NTFULL = driver.get_ntfull()
         if tage > 0.0:
-            return wavegrid, driver.get_spec(NSPEC, NTFULL)[0] * factor
-
+            return wavegrid, driver.get_spec(NSPEC, 1)[0] * factor
+        
+        NTFULL = driver.get_ntfull()
         return wavegrid, driver.get_spec(NSPEC, NTFULL) * factor[None, :]
 
     @property
@@ -558,13 +601,17 @@ class StellarPopulation(object):
         self.params["tage"] = tage
         if zmet is not None:
             self.params["zmet"] = zmet
-
+        
         if self.params.dirty:
             self._compute_csp()
-
-        NTFULL = driver.get_ntfull()
+        
+        if tage > 0.0:
+            NTFULL = 1
+        else:
+            NTFULL = driver.get_ntfull()
         NBANDS = driver.get_nbands()
-
+        NSPEC = driver.get_nspec()
+        
         band_array = np.ones(NBANDS, dtype=bool)
         if bands is not None:
             user_sorted_inds = np.array([FILTERS[band.lower()].index
@@ -574,7 +621,7 @@ class StellarPopulation(object):
                                 dtype=bool)] = False
 
         inds = np.array(band_array, dtype=int)
-        mags = driver.get_mags(NTFULL, redshift, inds)
+        mags = driver.get_mags(NSPEC, NTFULL, redshift, inds)
 
         if tage > 0.0:
             if bands is not None:
@@ -703,6 +750,54 @@ class StellarPopulation(object):
         driver.smooth_spectrum(wave, outspec, sigma, minw, maxw)
         return outspec
 
+    def get_stellar_spectrum(self, mact, logt, lbol, logg, phase, comp,
+                             weight=1, zmet=None, peraa=True):
+        """Get the spectrum of a star with a given set of physical
+        parameters.  This uses the metallicity given by the
+        current value of ``zmet``.
+
+        :param mact:
+            Actual stellar mass (after taking into account mass loss).
+            Used to calculate surface gravity.
+
+        :param logt:
+            The log of the effective temperature.
+
+        :param lbol:
+            Stellar luminosity, L_star/L_\sun
+
+        :param logg:
+            Log of the surface gravity g.  Note that this variable is
+            actually ignored, and logg is calculated internally using
+            ``mact``, ``lbol``, and ``logt``.
+
+        :param phase:
+            The evolutionary phase, 0 through 6.
+
+        :param comp:
+            Composition, in terms of C/O ratio.  Only used for AGB
+            stars (phase=5), where the division between carbon and
+            oxyygen rich stars is C/O = 1.
+
+        :returns outspec:
+            The spectrum of the star, in L_sun/Hz
+        """
+        if zmet is not None:
+            self.params["zmet"] = zmet
+
+        if self.params.dirty:
+            self._update_params()
+
+        NSPEC = driver.get_nspec()
+        outspec = np.zeros(NSPEC)
+        driver.stellar_spectrum(mact, logt, lbol, logg, phase, comp, weight, outspec)
+        if peraa:
+            wavegrid = self.wavelengths
+            factor = 3e18 / wavegrid ** 2
+            outspec *= factor
+
+        return outspec
+    
     def isochrones(self, outfile = 'pyfsps_tmp'):
         """Write the isochrone data (age, mass, weights, phases,
         magnitudes, etc.)  to a .cmd file, then read it into a huge
@@ -783,17 +878,22 @@ class StellarPopulation(object):
 class ParameterSet(object):
 
     ssp_params = ["imf_type", "imf1", "imf2", "imf3", "vdmc", "mdave",
-                  "dell", "delt", "sbss", "fbhb", "pagb", "agb_dust",
+                  "dell", "delt", "sbss", "fbhb", "pagb", "add_stellar_remnants",
+                  "tpagb_norm_type", "add_agb_dust_model", "agb_dust",
                   "redgb", "masscut", "fcstar", "evtype"]
 
-    csp_params = ["dust_type", "zmet", "sfh", "wgp1", "wgp2", "wgp3",
+    csp_params = ["smooth_velocity", "vactoair_flag", "redshift_colors",
+                  "dust_type", "add_dust_emission", "add_neb_emission",
+                  "add_neb_continuum", "cloudy_dust", "add_igm_absorption",
+                  "zmet", "sfh", "wgp1", "wgp2", "wgp3",
                   "tau", "const", "tage", "fburst", "tburst",
                   "dust1", "dust2", "logzsol", "zred", "pmetals",
                   "dust_clumps", "frac_nodust", "dust_index", "dust_tesc",
                   "frac_obrun", "uvb", "mwr", "dust1_index",
-                  "sf_start", "sf_trunc", "sf_theta", "duste_gamma",
+                  "sf_start", "sf_trunc", "sf_slope", "duste_gamma",
                   "duste_umin", "duste_qpah", "sigma_smooth",
-                  "min_wave_smooth", "max_wave_smooth"]
+                  "min_wave_smooth", "max_wave_smooth", "gas_logu",
+                  "gas_logz", "igm_factor"]
 
     @property
     def all_params(self):
@@ -806,14 +906,17 @@ class ParameterSet(object):
     def __init__(self, **kwargs):
         self.dirtiness = 2
         self._params = kwargs
-        self.iteritems = self._params.iteritems
+        try:
+            self.iteritems = self._params.iteritems
+        except AttributeError:
+            self.iteritems = self._params.items
 
     def check_params(self):
         NZ = driver.get_nz()
         assert self._params["zmet"] in range(1, NZ + 1), \
             "zmet={0} out of range [1, {1}]".format(self._params["zmet"], NZ)
-        assert self._params["dust_type"] in range(4), \
-            "dust_type={0} out of range [0, 3]".format(
+        assert self._params["dust_type"] in range(5), \
+            "dust_type={0} out of range [0, 4]".format(
                 self._params["dust_type"])
         assert self._params["imf_type"] in range(6), \
             "imf_type={0} out of range [0, 5]".format(self._params["imf_type"])
